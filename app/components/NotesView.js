@@ -9,26 +9,31 @@ export default function NotesView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const load = useCallback(async (query) => {
+  const load = useCallback(async (query, signal) => {
     setLoading(true);
     try {
       const url = query
         ? `/api/notes?q=${encodeURIComponent(query)}`
         : "/api/notes";
-      const res = await fetch(url, { cache: "no-store" });
+      const res = await fetch(url, { cache: "no-store", signal });
       const data = await res.json();
       setNotes(data.notes ?? []);
       setError("");
-    } catch {
+    } catch (err) {
+      if (err?.name === "AbortError") return;
       setError("Could not load notes.");
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    const handle = setTimeout(() => load(search), 200);
-    return () => clearTimeout(handle);
+    const controller = new AbortController();
+    const handle = setTimeout(() => load(search, controller.signal), 200);
+    return () => {
+      clearTimeout(handle);
+      controller.abort();
+    };
   }, [search, load]);
 
   async function togglePin(note) {
