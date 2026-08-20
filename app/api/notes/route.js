@@ -28,10 +28,15 @@ export async function POST(request) {
   const payload = await request.json();
 
   const title = typeof payload.title === "string" ? payload.title.trim() : "";
-  const content = payload.content.trim();
+  const content =
+    typeof payload.content === "string" ? payload.content.trim() : "";
 
   if (!title) {
     return Response.json({ error: "Title is required" }, { status: 400 });
+  }
+
+  if (!content) {
+    return Response.json({ error: "Content is required" }, { status: 400 });
   }
 
   if (title.length > 120) {
