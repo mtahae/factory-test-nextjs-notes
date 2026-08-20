@@ -8,6 +8,10 @@ export default function NotesView() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editContent, setEditContent] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async (query) => {
     setLoading(true);
@@ -45,6 +49,46 @@ export default function NotesView() {
     load(search);
   }
 
+  function startEdit(note) {
+    setEditingId(note.id);
+    setEditTitle(note.title);
+    setEditContent(note.content);
+    setError("");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditTitle("");
+    setEditContent("");
+  }
+
+  async function saveEdit(note) {
+    const title = editTitle.trim();
+    if (!title) {
+      setError("Title is required");
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/notes/${note.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, content: editContent }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error ?? "Could not save the note.");
+        return;
+      }
+      cancelEdit();
+      load(search);
+    } catch {
+      setError("Could not save the note.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <>
       <NoteComposer onCreated={() => load(search)} />
@@ -67,23 +111,60 @@ export default function NotesView() {
 
         {notes.map((note) => (
           <article className="note" key={note.id}>
-            <h3>{note.title}</h3>
-            <p>{note.content}</p>
-            <div className="note-meta">
-              {note.pinned && <span className="pin-badge">PINNED</span>}
-              {note.tags.map((tag) => (
-                <span className="tag" key={tag}>
-                  {tag}
-                </span>
-              ))}
-              <span>{new Date(note.updatedAt).toLocaleDateString()}</span>
-              <button className="link" onClick={() => togglePin(note)}>
-                {note.pinned ? "Unpin" : "Pin"}
-              </button>
-              <button className="link danger" onClick={() => remove(note)}>
-                Delete
-              </button>
-            </div>
+            {editingId === note.id ? (
+              <div className="note-edit">
+                <div className="field">
+                  <label>Title</label>
+                  <input
+                    type="text"
+                    value={editTitle}
+                    onChange={(event) => setEditTitle(event.target.value)}
+                  />
+                </div>
+                <div className="field">
+                  <label>Content</label>
+                  <textarea
+                    value={editContent}
+                    onChange={(event) => setEditContent(event.target.value)}
+                  />
+                </div>
+                <div className="note-meta">
+                  <button
+                    className="primary"
+                    onClick={() => saveEdit(note)}
+                    disabled={saving}
+                  >
+                    {saving ? "Saving…" : "Save"}
+                  </button>
+                  <button className="link" onClick={cancelEdit} disabled={saving}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <h3>{note.title}</h3>
+                <p>{note.content}</p>
+                <div className="note-meta">
+                  {note.pinned && <span className="pin-badge">PINNED</span>}
+                  {note.tags.map((tag) => (
+                    <span className="tag" key={tag}>
+                      {tag}
+                    </span>
+                  ))}
+                  <span>{new Date(note.updatedAt).toLocaleDateString()}</span>
+                  <button className="link" onClick={() => startEdit(note)}>
+                    Edit
+                  </button>
+                  <button className="link" onClick={() => togglePin(note)}>
+                    {note.pinned ? "Unpin" : "Pin"}
+                  </button>
+                  <button className="link danger" onClick={() => remove(note)}>
+                    Delete
+                  </button>
+                </div>
+              </>
+            )}
           </article>
         ))}
       </section>
